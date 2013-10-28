@@ -26,7 +26,7 @@ set (opm-core_DEPS
         # xml processing (for config parsing)
         "TinyXML"
         # opm-parser
-        "opm-parser"
+        "opm-parser REQUIRED"
         # Ensembles-based Reservoir Tools (ERT)
         "ERT"
         # DUNE dependency
