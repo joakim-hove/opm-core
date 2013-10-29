@@ -27,6 +27,7 @@ set (opm-core_DEPS
         "TinyXML"
         # opm-parser
         "opm-parser REQUIRED"
+        "cjson REQUIRED"
         # Ensembles-based Reservoir Tools (ERT)
         "ERT"
         # DUNE dependency
