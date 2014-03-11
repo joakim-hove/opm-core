@@ -35,7 +35,7 @@ void summarizeSchedule(const std::shared_ptr<const Opm::EclipseState> eclipseSta
     Opm::SimulatorTimer simTimer;
     simTimer.init(  eclipseState->getSchedule()->getTimeMap() );
     
-    for (size_t timeStep = 0; timeStep < simTimer.numSteps(); timeStep++) {
+    for (size_t timeStep = 0; timeStep < simTimer.numSteps(); timeStep) {
         Opm::WellsManager wells( eclipseState , timeStep , *gridManager.c_grid() , NULL /* Perm */ ); 
     }
 }
