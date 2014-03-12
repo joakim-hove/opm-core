@@ -18,25 +18,44 @@
 */
 
 
-#include <iostream>
-#include <memory>
-
 #include <opm/parser/eclipse/Parser/Parser.hpp>
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
 
 #include <opm/core/wells/WellsManager.hpp>
 #include <opm/core/io/eclipse/EclipseGridParser.hpp>
 #include <opm/core/grid/GridManager.hpp>
 #include <opm/core/simulator/SimulatorTimer.hpp>
 
+#include <iostream>
+#include <memory>
+#include <vector>
+
 
 void summarizeSchedule(const std::shared_ptr<const Opm::EclipseState> eclipseState , const Opm::GridManager& gridManager) {
     Opm::SimulatorTimer simTimer;
-    simTimer.init(  eclipseState->getSchedule()->getTimeMap() );
+    std::shared_ptr<const Opm::Schedule> schedule = eclipseState->getSchedule();
+    simTimer.init(  schedule->getTimeMap() );
     
-    for (size_t timeStep = 0; timeStep < simTimer.numSteps(); timeStep) {
+    for (size_t timeStep = 0; timeStep < simTimer.numSteps(); timeStep++) {
         Opm::WellsManager wells( eclipseState , timeStep , *gridManager.c_grid() , NULL /* Perm */ ); 
+    }
+    std::cout << "Timesteps: " << simTimer.numSteps() << std::endl;
+    
+    {
+        size_t wellIndex;
+        std::vector<Opm::WellConstPtr> wells = schedule->getWells();
+        
+        std::cout << "Wells: ";
+        for (wellIndex = 0; wellIndex  < schedule->numWells(); wellIndex++) {
+            Opm::WellConstPtr well = wells[wellIndex];
+            std::cout << well->name() << " ";
+            if ((wellIndex % 8) == 7)
+                std::cout << std::endl << "       ";
+            
+        }
+        std::cout << std::endl;
     }
 }
 
