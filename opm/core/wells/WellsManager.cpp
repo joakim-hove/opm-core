@@ -669,7 +669,7 @@ namespace Opm
                             well_controls_shut_well( w_->ctrls[wix]);
                         } else if (cpos == -1 && mode != InjectionControl::GRUP) {
                             OPM_THROW(std::runtime_error, "Control for " << wci_line.control_mode_ << " not specified in well " << well_names[wix]);
-                        }
+                        } 
                         set_current_control(wix, cpos, w_);
 
                         // Set well component fraction.
