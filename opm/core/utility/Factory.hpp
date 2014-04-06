@@ -142,7 +142,7 @@ namespace Opm
             it = string_to_creator_.find(type);
             if (it == string_to_creator_.end()) {
                 OPM_THROW(std::runtime_error, "Creator type " << type
-                      << " is not registered in the factory.");
+                             << " is not registered in the factory.");
             }
             return it->second->create();
         }

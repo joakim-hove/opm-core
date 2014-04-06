@@ -116,19 +116,16 @@ namespace EclipseKeywords
 
     string special_fields[] =
         { string("SPECGRID"), string("FAULTS"), string("MULTFLT"),
-          string("TITLE"),    string("START"),  string("DATES"),
+          string("TITLE"),    string("START"),
           string("DENSITY"),  string("PVDG"),   string("PVDO"),
           string("PVTG"),     string("PVTO"),   string("PVTW"),
           string("SGOF"),     string("SWOF"),   string("ROCK"),
-          string("ROCKTAB"),  string("WELSPECS"), string("COMPDAT"),
-          string("WCONINJE"), string("WCONPROD"), string("WELTARG"),
-          string("WELOPEN"),
+          string("ROCKTAB"),  
           string("EQUIL"),    string("PVCDO"),    string("TSTEP"),
           string("PLYVISC"),  string("PLYROCK"),  string("PLYADS"),
           string("PLYMAX"),   string("TLMIXPAR"), string("WPOLYMER"),
           string("PLYSHEAR"),
-          string("GRUPTREE"), string("GCONINJE"), string("GCONPROD"),
-          string("WGRUPCON"), string("ENDSCALE"),  string("SCALECRS"),
+          string("ENDSCALE"),  string("SCALECRS"),
           string("ENPTVD"),   string("ENKRVD"),
           // The following fields only have a dummy implementation
           // that allows us to ignore them.
@@ -146,7 +143,13 @@ namespace EclipseKeywords
           string("RPTRST"),   string("ROIP"),     string("RWIP"),
           string("RWSAT"),    string("RPR"),      string("WBHP"),
           string("WOIR"),     string("BOX"),
-          string("COORDSYS"), string("PBVD")
+          string("COORDSYS"), string("PBVD"),
+          string("WELSPECS"), string("COMPDAT"),
+          string("WCONINJE"), string("WCONPROD"), string("WELTARG"),
+          string("WELOPEN"),
+          string("GRUPTREE"), string("GCONINJE"), string("GCONPROD"),
+          string("WGRUPCON"),
+          string("DATES")
         };
     const int num_ignore_with_data = sizeof(ignore_with_data) / sizeof(ignore_with_data[0]);
 
@@ -237,7 +240,7 @@ EclipseGridParser::EclipseGridParser(const string& filename, bool convert_to_SI)
       return Integer;
     } else if (count(floating_fields, floating_fields + num_floating_fields, keyword)) {
       return FloatingPoint;
-    } else if (keyword == "TSTEP" || keyword == "DATES") {
+    } else if (keyword == "TSTEP") {
       return Timestepping;
     } else if (count(special_fields, special_fields + num_special_fields, keyword)) {
       return SpecialField;

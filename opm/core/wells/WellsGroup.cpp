@@ -1045,7 +1045,8 @@ namespace Opm
         }
     } // anonymous namespace
 
-    std::shared_ptr<WellsGroupInterface> createWellsGroup(const std::string& name,
+    /*
+      std::shared_ptr<WellsGroupInterface> createWellsGroup(const std::string& name,
                                                                const EclipseGridParser& deck)
     {
         PhaseUsage phase_usage = phaseUsageFromDeck(deck);
@@ -1139,6 +1140,7 @@ namespace Opm
 
         return return_value;
     }
+    */
 
     std::shared_ptr<WellsGroupInterface> createGroupWellsGroup(GroupConstPtr group, size_t timeStep, const PhaseUsage& phase_usage )
     {

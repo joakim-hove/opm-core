@@ -928,28 +928,6 @@ private:
  */
 struct EclipseWellReport : public EclipseHandle <smspec_node_type> {
 protected:
-    EclipseWellReport (const EclipseSummary& summary,    /* section to add to  */
-                       const EclipseGridParser& parser,  /* well names         */
-                       int whichWell,                    /* index of well line */
-                       PhaseUsage uses,                  /* phases present     */
-                       BlackoilPhases::PhaseIndex phase, /* oil, water or gas  */
-                       WellType type,                    /* prod. or inj.      */
-                       char aggregation,                 /* rate or total or BHP */
-                       std::string unit)
-        : EclipseHandle <smspec_node_type> (
-              ecl_sum_add_var (summary,
-                               varName (phase,
-                                        type,
-                                        aggregation).c_str (),
-                               wellName (parser, whichWell).c_str (),
-                               /* num = */ 0,
-                               unit.c_str(),
-                               /* defaultValue = */ 0.))
-        // save these for when we update the value in a timestep
-        , index_ (whichWell * uses.num_phases + uses.phase_pos [phase])
-
-        // producers can be seen as negative injectors
-        , sign_ (type == INJECTOR ? +1. : -1.) { }
 
     EclipseWellReport (const EclipseSummary& summary,    /* section to add to  */
                        Opm::DeckConstPtr newParserDeck,  /* well names         */
@@ -993,10 +971,11 @@ private:
     const double sign_;
 
     /// Get the name associated with this well
-    std::string wellName (const EclipseGridParser& parser,
+    /*std::string wellName (const EclipseGridParser& parser,
                           int whichWell) {
         return parser.getWELSPECS().welspecs[whichWell].name_;
     }
+    */
 
     /// Get the name associated with this well
     std::string wellName (Opm::DeckConstPtr newParserDeck,
@@ -1054,21 +1033,6 @@ protected:
 /// Monitors the rate given by a well.
 struct EclipseWellRate : public EclipseWellReport {
     EclipseWellRate (const EclipseSummary& summary,
-                     const EclipseGridParser& parser,
-                     int whichWell,
-                     PhaseUsage uses,
-                     BlackoilPhases::PhaseIndex phase,
-                     WellType type)
-        : EclipseWellReport (summary,
-                             parser,
-                             whichWell,
-                             uses,
-                             phase,
-                             type,
-                             'R',
-                             "SM3/DAY" /* surf. cub. m. per day */ ) { }
-
-    EclipseWellRate (const EclipseSummary& summary,
                      Opm::DeckConstPtr newParserDeck,
                      int whichWell,
                      PhaseUsage uses,
@@ -1092,23 +1056,6 @@ struct EclipseWellRate : public EclipseWellReport {
 
 /// Monitors the total production in a well.
 struct EclipseWellTotal : public EclipseWellReport {
-    EclipseWellTotal (const EclipseSummary& summary,
-                      const EclipseGridParser& parser,
-                      int whichWell,
-                      PhaseUsage uses,
-                      BlackoilPhases::PhaseIndex phase,
-                      WellType type)
-        : EclipseWellReport (summary,
-                             parser,
-                             whichWell,
-                             uses,
-                             phase,
-                             type,
-                             'T',
-                             "SM3" /* surface cubic meter */ )
-
-        // nothing produced when the reporting starts
-        , total_ (0.) { }
 
     EclipseWellTotal (const EclipseSummary& summary,
                       Opm::DeckConstPtr newParserDeck,
@@ -1153,22 +1100,6 @@ private:
 /// Monitors the bottom hole pressure in a well.
 struct EclipseWellBhp : public EclipseWellReport {
     EclipseWellBhp   (const EclipseSummary& summary,
-                      const EclipseGridParser& parser,
-                      int whichWell,
-                      PhaseUsage uses,
-                      BlackoilPhases::PhaseIndex phase,
-                      WellType type)
-        : EclipseWellReport (summary,
-                             parser,
-                             whichWell,
-                             uses,
-                             phase,
-                             type,
-                             'B',
-                             "Pascal")
-    { }
-
-    EclipseWellBhp   (const EclipseSummary& summary,
                       Opm::DeckConstPtr newParserDeck,
                       int whichWell,
                       PhaseUsage uses,
@@ -1208,68 +1139,6 @@ EclipseSummary::writeTimeStep (const SimulatorTimer& timer,
 /// so we must have an explicit array.
 static WellType WELL_TYPES[] = { INJECTOR, PRODUCER };
 
-inline void
-EclipseSummary::addWells (const EclipseGridParser& parser,
-                          const PhaseUsage& uses)
-{
-    // TODO: Only create report variables that are requested with keywords
-    // (e.g. "WOPR") in the input files, and only for those wells that are
-    // mentioned in those keywords
-    const int numWells = parser.getWELSPECS().welspecs.size();
-    for (int phaseCounter = 0;
-          phaseCounter != BlackoilPhases::MaxNumPhases;
-          ++phaseCounter) {
-        const BlackoilPhases::PhaseIndex phase =
-                static_cast <BlackoilPhases::PhaseIndex> (phaseCounter);
-        // don't bother with reporting for phases that aren't there
-        if (!uses.phase_used [phaseCounter]) {
-            continue;
-        }
-        for (size_t typeIndex = 0;
-             typeIndex < sizeof (WELL_TYPES) / sizeof (WELL_TYPES[0]);
-             ++typeIndex) {
-            const WellType type = WELL_TYPES[typeIndex];
-            for (int whichWell = 0; whichWell != numWells; ++whichWell) {
-                // W{O,G,W}{I,P}R
-                add (std::unique_ptr <EclipseWellReport> (
-                              new EclipseWellRate (*this,
-                                                   parser,
-                                                   whichWell,
-                                                   uses,
-                                                   phase,
-                                                   type)));
-                // W{O,G,W}{I,P}T
-                add (std::unique_ptr <EclipseWellReport> (
-                              new EclipseWellTotal (*this,
-                                                    parser,
-                                                    whichWell,
-                                                    uses,
-                                                    phase,
-                                                    type)));
-            }
-        }
-    }
-
-    // Add BHP monitors
-    for (int whichWell = 0; whichWell != numWells; ++whichWell) {
-        // In the call below: uses, phase and the well type arguments
-        // are not used, except to set up an index that stores the
-        // well indirectly. For details see the implementation of the
-        // EclipseWellReport constructor, and the method
-        // EclipseWellReport::bhp().
-        BlackoilPhases::PhaseIndex phase = BlackoilPhases::Liquid;
-        if (!uses.phase_used[BlackoilPhases::Liquid]) {
-            phase = BlackoilPhases::Vapour;
-        }
-        add (std::unique_ptr <EclipseWellReport> (
-                        new EclipseWellBhp (*this,
-                                            parser,
-                                            whichWell,
-                                            uses,
-                                            phase,
-                                            WELL_TYPES[0])));
-    }
-}
 
 inline void
 EclipseSummary::addWells (Opm::DeckConstPtr newParserDeck,
