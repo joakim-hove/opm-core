@@ -122,11 +122,6 @@ namespace Opm
     /// Returns the number of distinct epochs found in the deck SCHEDULE.
     int numberOfEpochs() const;
 
-    /// Sets the current epoch.
-    /// Valid arguments are in [0, ..., numberOfEpochs() - 1].
-    /// After reading, current epoch always starts at 0.
-    void setCurrentEpoch(int epoch);
-
     /// Returns the start_date_
     boost::gregorian::date getStartDate() const;
 

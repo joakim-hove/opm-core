@@ -239,9 +239,6 @@ BOOST_AUTO_TEST_CASE(WellHasSTOP_ExceptionIsThrown) {
 
     Opm::ParserPtr parser(new Opm::Parser());
     Opm::EclipseStateConstPtr eclipseState(new Opm::EclipseState(parser->parseFile("wells_manager_data_wellSTOP.data")));
-
-    Deck.setCurrentEpoch(0);
-
     BOOST_CHECK_THROW( new Opm::WellsManager(eclipseState, 0, *gridManager.c_grid(), NULL), std::runtime_error );
 }
 

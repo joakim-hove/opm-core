@@ -243,12 +243,9 @@ try
         int step = 0;
         SimulatorTimer simtimer;
         // Use timer for last epoch to obtain total time.
-        deck->setCurrentEpoch(deck->numberOfEpochs() - 1);
         simtimer.init(*deck);
         const double total_time = simtimer.totalTime();
         for (int epoch = 0; epoch < deck->numberOfEpochs(); ++epoch) {
-            // Set epoch index.
-            deck->setCurrentEpoch(epoch);
 
             // Update the timer.
             if (deck->hasField("TSTEP")) {

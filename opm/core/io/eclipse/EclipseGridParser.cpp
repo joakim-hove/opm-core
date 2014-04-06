@@ -680,13 +680,6 @@ int EclipseGridParser::numberOfEpochs() const
 }
 
 
-//---------------------------------------------------------------------------
-void EclipseGridParser::setCurrentEpoch(int epoch)
-//---------------------------------------------------------------------------
-{
-    assert(epoch >= 0 && epoch < numberOfEpochs());
-    current_epoch_ = epoch;
-}
 
 //-----------------------------------------------------------------
 boost::gregorian::date EclipseGridParser::getStartDate() const
