@@ -301,6 +301,8 @@ struct UnstructuredGrid *
 read_grid(const char *fname);
 
 
+void
+grid_ascii_dump(const struct UnstructuredGrid * grid , const char * filename);
 
 bool 
 grid_equal(const struct UnstructuredGrid * grid1 , const struct UnstructuredGrid * grid2);

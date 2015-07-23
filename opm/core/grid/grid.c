@@ -567,6 +567,63 @@ static int memcmp_double(const double * p1 , const double *p2 , size_t num_eleme
 }
 
 
+static void
+ascii_dump_int_vector(const char * name , const int * vector, size_t length , FILE * stream) {
+    size_t i;
+    fprintf(stream , "%s \n",name);
+    for (i=0; i < length; i++) {
+        fprintf(stream , "%d " , vector[i]);
+        if ((i % 5) == 0 )
+            fprintf(stream,"\n");
+    }
+    fprintf(stream,"\n");
+}
+
+
+static void
+ascii_dump_double_vector(const char * name , const double * vector , size_t length , FILE * stream) {
+    size_t i;
+    fprintf(stream , "%s \n",name);
+    for (i=0; i < length; i++) {
+        fprintf(stream , "%lg " , vector[i]);
+        if ((i % 5) == 0 )
+            fprintf(stream,"\n");
+    }
+    fprintf(stream,"\n");
+}
+
+
+
+void
+grid_ascii_dump(const struct UnstructuredGrid * grid , const char * filename) {
+    FILE * stream = fopen( filename , "w");
+    if (stream) {
+        fprintf(stream , "#Dimensions: %d\n", grid->dimensions);
+        fprintf(stream , "#Cells     : %d\n", grid->number_of_cells);
+        fprintf(stream , "#Faces     : %d\n", grid->number_of_faces);
+        fprintf(stream , "#Nodes     : %d\n", grid->number_of_nodes);
+        fprintf(stream , "Grid dims  : %d %d %d\n", grid->cartdims[0], grid->cartdims[1], grid->cartdims[2] );
+
+        ascii_dump_int_vector("face_nodes" ,  grid->face_nodes , grid->face_nodepos[grid->number_of_faces] , stream);
+        ascii_dump_int_vector("face_nodepos" ,  grid->face_nodepos , grid->number_of_faces + 1  , stream);
+        ascii_dump_int_vector("face_cells " ,  grid->face_cells  , 2*grid->number_of_faces   , stream);
+        ascii_dump_int_vector("cell_faces " ,  grid->cell_faces  , grid->cell_facepos[grid->number_of_cells]   , stream);
+        ascii_dump_int_vector("cell_facepos " ,  grid->cell_facepos  , grid->number_of_cells + 1   , stream);
+        ascii_dump_int_vector("cell_facetag" ,  grid->cell_facetag , grid->cell_facepos[grid->number_of_cells]  , stream);
+        ascii_dump_int_vector("global_cell" ,  grid->global_cell , grid->number_of_cells  , stream);
+
+        ascii_dump_double_vector("node_coordinates" , grid->node_coordinates , grid->number_of_nodes * grid->dimensions , stream);
+        ascii_dump_double_vector("face_centroids" , grid->face_centroids , grid->number_of_faces * grid->dimensions , stream);
+        ascii_dump_double_vector("face_areas" , grid->face_areas , grid->number_of_faces , stream);
+        ascii_dump_double_vector("face_normals" , grid->face_normals , grid->number_of_faces * grid->dimensions , stream);
+        ascii_dump_double_vector("cell_centroids" , grid->cell_centroids , grid->number_of_cells * grid->dimensions , stream);
+        ascii_dump_double_vector("cell_volumes" , grid->cell_volumes , grid->number_of_cells , stream);
+
+        fclose( stream );
+    }
+}
+
+
 bool 
 grid_equal(const struct UnstructuredGrid * grid1 , const struct UnstructuredGrid * grid2) {
     if ((grid1->dimensions      == grid2->dimensions)      &&
