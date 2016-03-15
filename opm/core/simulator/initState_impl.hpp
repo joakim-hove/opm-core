@@ -200,7 +200,7 @@ namespace Opm
                                      const double datum_p,
                                      State& state)
         {
-            std::vector<double>& p = state.pressure();
+	    std::vector<double>& p = state.getCellData( State::PRESSURE );
             // Compute pressure at woc
             const double rho_datum = datum_z > woc ? densities[0] : densities[1];
             const double woc_p = datum_p + (woc - datum_z)*gravity*rho_datum;
@@ -349,7 +349,7 @@ namespace Opm
             MonotCubicInterpolator press(zv, pv);
 
             // Evaluate pressure at each cell centroid.
-            std::vector<double>& p = state.pressure();
+            std::vector<double>& p = state.getCellData( State::PRESSURE );
             for (int c = 0; c < number_of_cells; ++c) {
                 const double z = UgGridHelpers::
                     getCoordinate(UgGridHelpers::increment(begin_cell_centroids, c, dimensions),
@@ -367,8 +367,8 @@ namespace Opm
                               CCI begin_cell_centroids,
                               State& state)
         {
-            const std::vector<double>& cp = state.pressure();
-            std::vector<double>& fp = state.facepressure();
+ 	    const std::vector<double>& cp = state.getCellData( State::PRESSURE );
+            std::vector<double>& fp = state.getFaceData( State::FACEPRESSURE );
             for (int f = 0; f < number_of_faces; ++f) {
                 double dist[2] = { 0.0, 0.0 };
                 double press[2] = { 0.0, 0.0 };
@@ -465,7 +465,10 @@ namespace Opm
 
 	    initSaturation( left_cells , props , state , MaxSat );
             const double init_p = param.getDefault("ref_pressure", 100.0)*unit::barsa;
-            std::fill(state.pressure().begin(), state.pressure().end(), init_p);
+	    {
+		auto& pressure = state.getCellData( State::PRESSURE );
+		std::fill(pressure.begin(), pressure.end(), init_p);
+	    }
         } else if (segregation_testcase) {
             // Warn against error-prone usage.
             if (gravity == 0.0) {
@@ -502,9 +505,10 @@ namespace Opm
         } else if (param.has("init_saturation")) {
             // Initialise water saturation to init_saturation parameter.
             const double init_saturation = param.get<double>("init_saturation");
+	    auto& saturation = state.getCellData( State::SATURATION );
             for (int cell = 0; cell < num_cells; ++cell) {
-                state.saturation()[2*cell] = init_saturation;
-                state.saturation()[2*cell + 1] = 1.0 - init_saturation;
+                saturation[2*cell] = init_saturation;
+                saturation[2*cell + 1] = 1.0 - init_saturation;
             }
             // Initialise pressure to hydrostatic state.
             const double ref_p = param.getDefault("ref_pressure", 100.0)*unit::barsa;
@@ -584,7 +588,10 @@ namespace Opm
             }
 	    initSaturation(left_cells , props , state , MaxSat );
             const double init_p = param.getDefault("ref_pressure", 100.0)*unit::barsa;
-            std::fill(state.pressure().begin(), state.pressure().end(), init_p);
+	    {
+		auto& pressure = state.getCellData( State::PRESSURE );
+		std::fill(pressure.begin(), pressure.end(), init_p);
+	    }
         } else if (param.has("water_oil_contact")) {
             // Warn against error-prone usage.
             if (gravity == 0.0) {
@@ -677,8 +684,8 @@ namespace Opm
                                     props, woc, gravity, datum_z, datum_p, state);
         } else if (deck->hasKeyword("PRESSURE")) {
             // Set saturations from SWAT/SGAS, pressure from PRESSURE.
-            std::vector<double>& s = state.saturation();
-            std::vector<double>& p = state.pressure();
+            std::vector<double>& s = state.getCellData( State::SATURATION );
+            std::vector<double>& p = state.getCellData( State::PRESSURE );
             const std::vector<double>& p_deck = deck->getKeyword("PRESSURE").getSIDoubleData();
             const int num_cells = number_of_cells;
             if (num_phases == 2) {
@@ -756,22 +763,27 @@ namespace Opm
                              const Props& props,
                              State& state)
     {
-        state.surfacevol() = state.saturation();
+	const auto& saturation = state.getCellData( State::SATURATION );
+	const auto& pressure = state.getCellData( State::PRESSURE );
+	const auto& temperature = state.getCellData( State::TEMPERATURE );
+	auto& surfacevol = state.getCellData( State::SURFACEVOL );
         const int np = props.numPhases();
         const int nc = number_of_cells;
         std::vector<double> allA(nc*np*np);
         std::vector<int> allcells(nc);
+
+	std::copy( saturation.begin(), saturation.end(), surfacevol.begin());
         for (int c = 0; c < nc; ++c) {
             allcells[c] = c;
         }
         // Assuming that using the saturation as z argument here does not change
         // the outcome. This is not guaranteed unless we have only a single phase
         // per cell.
-        props.matrix(nc, &state.pressure()[0], &state.temperature()[0], &state.surfacevol()[0], &allcells[0], &allA[0], 0);
+        props.matrix(nc, pressure.data(), temperature.data(), surfacevol.data(), &allcells[0], &allA[0], 0);
         for (int c = 0; c < nc; ++c) {
             // Using z = As
-            double* z = &state.surfacevol()[c*np];
-            const double* s = &state.saturation()[c*np];
+            double* z = &surfacevol[c*np];
+            const double* s = &saturation[c*np];
             const double* A = &allA[c*np*np];
 
             for (int row = 0; row < np; ++row) { z[row] = 0.0; }
@@ -804,11 +816,14 @@ namespace Opm
         if (props.numPhases() != 3) {
             OPM_THROW(std::runtime_error, "initBlackoilSurfvol() is only supported in three-phase simulations.");
         }
-        const std::vector<double>& rs = state.gasoilratio();
-        const std::vector<double>& rv = state.rv();
+        const std::vector<double>& rs = state.getCellData( State::GASOILRATIO );
+        const std::vector<double>& rv = state.getCellData( State::RV );
+	const auto& pressure = state.getCellData( State::PRESSURE );
+	const auto& saturation = state.getCellData( State::SATURATION );
+	const auto& temperature = state.getCellData( State::TEMPERATURE );
+	auto& surfacevol = state.getCellData( State::SURFACEVOL );
 
         //make input for computation of the A matrix
-        state.surfacevol() = state.saturation();
         const PhaseUsage pu = props.phaseUsage();
 
         const int np = props.numPhases();
@@ -819,21 +834,22 @@ namespace Opm
 
         std::vector<int> allcells(number_of_cells);
         std::vector<double> z_init(number_of_cells*np);
-        std::fill(z_init.begin(),z_init.end(),0.0);
 
+	std::copy( saturation.begin(), saturation.end(), surfacevol.begin());
+        std::fill(z_init.begin(),z_init.end(),0.0);
         for (int c = 0; c < number_of_cells; ++c) {
             allcells[c] = c;
         }
 
         std::vector<double> capPressures(number_of_cells*np);
-        props.capPress(number_of_cells,&state.saturation()[0],&allcells[0],&capPressures[0],NULL);
+        props.capPress(number_of_cells,saturation.data(),&allcells[0],&capPressures[0],NULL);
 
         std::vector<double> Pw(number_of_cells);
         std::vector<double> Pg(number_of_cells);
 
         for (int c = 0; c < number_of_cells; ++c){
-            Pw[c] = state.pressure()[c] + capPressures[c*np + BlackoilPhases::Aqua];
-            Pg[c] = state.pressure()[c] + capPressures[c*np + BlackoilPhases::Vapour];
+            Pw[c] = pressure[c] + capPressures[c*np + BlackoilPhases::Aqua];
+            Pg[c] = pressure[c] + capPressures[c*np + BlackoilPhases::Vapour];
         }
 
 
@@ -851,14 +867,14 @@ namespace Opm
                    z_init[c*np + p] = z_tmp;
                }
            }
-        props.matrix(number_of_cells, &state.pressure()[0], &state.temperature()[0], &z_init[0], &allcells[0], &allA_a[0], 0);
+        props.matrix(number_of_cells, pressure.data(), temperature.data(), &z_init[0], &allcells[0], &allA_a[0], 0);
 
         // Liquid phase
         if(pu.phase_used[BlackoilPhases::Liquid]){
             for (int c = 0; c <  number_of_cells ; ++c){
                 for (int p = 0; p < np ; ++p){
                      if(p == BlackoilPhases::Vapour){
-                         if(state.saturation()[np*c + p] > 0)
+                         if(saturation[np*c + p] > 0)
                              z_tmp = 1e10;
                          else
                              z_tmp = rs[c];
@@ -873,13 +889,13 @@ namespace Opm
                 }
             }
         }
-        props.matrix(number_of_cells, &state.pressure()[0], &state.temperature()[0], &z_init[0], &allcells[0], &allA_l[0], 0);
+        props.matrix(number_of_cells, pressure.data(), temperature.data(), &z_init[0], &allcells[0], &allA_l[0], 0);
 
         if(pu.phase_used[BlackoilPhases::Vapour]){
             for (int c = 0; c <  number_of_cells ; ++c){
                 for (int p = 0; p < np ; ++p){
                      if(p == BlackoilPhases::Liquid){
-                         if(state.saturation()[np*c + p] > 0)
+                         if(saturation[np*c + p] > 0)
                              z_tmp = 1e10;
                          else
                              z_tmp = rv[c];
@@ -894,12 +910,12 @@ namespace Opm
                 }
             }
         }
-        props.matrix(number_of_cells, &state.pressure()[0], &state.temperature()[0], &z_init[0], &allcells[0], &allA_v[0], 0);
+        props.matrix(number_of_cells, pressure.data(), temperature.data(), &z_init[0], &allcells[0], &allA_v[0], 0);
 
         for (int c = 0; c < number_of_cells; ++c) {
             // Using z = As
-            double* z = &state.surfacevol()[c*np];
-            const double* s = &state.saturation()[c*np];
+            double* z = &surfacevol[c*np];
+            const double* s = &saturation[c*np];
             const double* A_a = &allA_a[c*np*np];
             const double* A_l = &allA_l[c*np*np];
             const double* A_v = &allA_v[c*np*np];
@@ -951,27 +967,29 @@ namespace Opm
                           face_cells, begin_face_centroids, begin_cell_centroids,
                           dimensions, props, deck, gravity, state);
         if (deck->hasKeyword("RS")) {
+	    auto& gasoilratio = state.getCellData( State::GASOILRATIO );
             const std::vector<double>& rs_deck = deck->getKeyword("RS").getSIDoubleData();
             const int num_cells = number_of_cells;
             for (int c = 0; c < num_cells; ++c) {
                 int c_deck = (global_cell == NULL) ? c : global_cell[c];
-                state.gasoilratio()[c] = rs_deck[c_deck];
+                gasoilratio[c] = rs_deck[c_deck];
             }
             initBlackoilSurfvolUsingRSorRV(number_of_cells, props, state);
             computeSaturation(props,state);
         } else if (deck->hasKeyword("RV")){
+	    auto& rv = state.getCellData( State::RV );
             const std::vector<double>& rv_deck = deck->getKeyword("RV").getSIDoubleData();
             const int num_cells = number_of_cells;
             for (int c = 0; c < num_cells; ++c) {
                 int c_deck = (global_cell == NULL) ? c : global_cell[c];
-                state.rv()[c] = rv_deck[c_deck];
+                rv[c] = rv_deck[c_deck];
             }
             initBlackoilSurfvolUsingRSorRV(number_of_cells, props, state);
             computeSaturation(props,state);
         }
         else {
-            state.gasoilratio() = std::vector<double>(number_of_cells, 0.0);
-            state.rv() = std::vector<double>(number_of_cells, 0.0);
+	    state.getCellData( State::RV ) = std::vector<double>(number_of_cells, 0.0);
+	    state.getCellData( State::GASOILRATIO ) = std::vector<double>(number_of_cells, 0.0);
             initBlackoilSurfvolUsingRSorRV(number_of_cells, props, state);
             computeSaturation(props,state);
         }

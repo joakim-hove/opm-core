@@ -45,7 +45,7 @@ namespace Opm
 
         if (ecl_file_has_kw(file , temperature)) {
             ecl_kw_type* temperature_kw = ecl_file_iget_named_kw(file, temperature, 0);
-
+	    auto& temperature_state = simulator_state.getCellData(SimulationDataContainer::TEMPERATURE);
             if (ecl_kw_get_size(temperature_kw) != numcells) {
                 throw std::runtime_error("Read of restart file: Could not restore temperature data, length of data from file not equal number of cells");
             }
@@ -55,9 +55,9 @@ namespace Opm
             // factor and offset from the temperature values given in the deck to Kelvin
             double scaling = eclipse_state->getDeckUnitSystem().parse("Temperature")->getSIScaling();
             double offset  = eclipse_state->getDeckUnitSystem().parse("Temperature")->getSIOffset();
-
-            for (size_t index = 0; index < simulator_state.temperature().size(); ++index) {
-                simulator_state.temperature()[index] = unit::convert::from((double)temperature_data[index] - offset, scaling);
+	    
+            for (size_t index = 0; index < temperature_state.size(); ++index) {
+	        temperature_state[index] = unit::convert::from( (double)temperature_data[index] - offset, scaling);
             }
           } else {
               throw std::runtime_error("Read of restart file: File does not contain TEMP data\n");
@@ -74,15 +74,15 @@ namespace Opm
         if (ecl_file_has_kw(file , pressure)) {
 
             ecl_kw_type* pressure_kw = ecl_file_iget_named_kw(file, pressure, 0);
-
+	    auto& pressure_state = simulator_state.getCellData(SimulationDataContainer::PRESSURE);
             if (ecl_kw_get_size(pressure_kw) != numcells) {
                 throw std::runtime_error("Read of restart file: Could not restore pressure data, length of data from file not equal number of cells");
             }
 
             float* pressure_data = ecl_kw_get_float_ptr(pressure_kw);
             const double deck_pressure_unit = (eclipse_state->getDeckUnitSystem().getType() == UnitSystem::UNIT_TYPE_METRIC) ? Opm::unit::barsa : Opm::unit::psia;
-            for (size_t index = 0; index < simulator_state.pressure().size(); ++index) {
-                simulator_state.pressure()[index] = unit::convert::from((double)pressure_data[index], deck_pressure_unit);
+            for (size_t index = 0; index < pressure_state.size(); ++index) {
+                pressure_state[index] = unit::convert::from((double)pressure_data[index], deck_pressure_unit);
             }
         } else {
             throw std::runtime_error("Read of restart file: File does not contain PRESSURE data\n");
@@ -97,6 +97,7 @@ namespace Opm
 
         float* sgas_data = NULL;
         float* swat_data = NULL;
+	auto& saturation_state = simulator_state.getCellData(SimulationDataContainer::SATURATION);
 
         if (phaseUsage.phase_used[BlackoilPhases::Aqua]) {
             const char* swat = "SWAT";
@@ -104,7 +105,7 @@ namespace Opm
                 ecl_kw_type* swat_kw = ecl_file_iget_named_kw(file_type , swat, 0);
                 swat_data = ecl_kw_get_float_ptr(swat_kw);
                 std::vector<double> swat_datavec(&swat_data[0], &swat_data[numcells]);
-                EclipseIOUtil::addToStripedData(swat_datavec, simulator_state.saturation(), phaseUsage.phase_pos[BlackoilPhases::Aqua], phaseUsage.num_phases);
+                EclipseIOUtil::addToStripedData(swat_datavec, saturation_state, phaseUsage.phase_pos[BlackoilPhases::Aqua], phaseUsage.num_phases);
             } else {
                 std::string error_str = "Restart file is missing SWAT data!\n";
                 throw std::runtime_error(error_str);
@@ -117,7 +118,7 @@ namespace Opm
                 ecl_kw_type* sgas_kw = ecl_file_iget_named_kw(file_type , sgas, 0);
                 sgas_data = ecl_kw_get_float_ptr(sgas_kw);
                 std::vector<double> sgas_datavec(&sgas_data[0], &sgas_data[numcells]);
-                EclipseIOUtil::addToStripedData(sgas_datavec, simulator_state.saturation(), phaseUsage.phase_pos[BlackoilPhases::Vapour], phaseUsage.num_phases);
+                EclipseIOUtil::addToStripedData(sgas_datavec, saturation_state , phaseUsage.phase_pos[BlackoilPhases::Vapour], phaseUsage.num_phases);
             } else {
                 std::string error_str = "Restart file is missing SGAS data!\n";
                 throw std::runtime_error(error_str);

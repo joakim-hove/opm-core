@@ -159,10 +159,10 @@ namespace Opm
             OPM_THROW(std::runtime_error, "Failed to open " << vtkfilename.str());
         }
         Opm::DataMap dm;
-        dm["saturation"] = &state.saturation();
-        dm["pressure"] = &state.pressure();
+        dm["saturation"] = &state.getCellData( BlackoilState::SATURATION );
+	dm["pressure"] = &state.getCellData( BlackoilState::PRESSURE );
         std::vector<double> cell_velocity;
-        Opm::estimateCellVelocity(grid, state.faceflux(), cell_velocity);
+        Opm::estimateCellVelocity(grid, state.getFaceData( BlackoilState::FACEFLUX ), cell_velocity);
         dm["velocity"] = &cell_velocity;
         Opm::writeVtkData(grid, dm, vtkfile);
     }
@@ -174,11 +174,11 @@ namespace Opm
                                   const std::string& output_dir)
     {
         Opm::DataMap dm;
-        dm["saturation"] = &state.saturation();
-        dm["pressure"] = &state.pressure();
-        dm["surfvolume"] = &state.surfacevol();
+        dm["saturation"] = &state.getCellData( BlackoilState::SATURATION );
+        dm["pressure"] = &state.getCellData( BlackoilState::PRESSURE );
+        dm["surfvolume"] = &state.getCellData( BlackoilState::SURFACEVOL );
         std::vector<double> cell_velocity;
-        Opm::estimateCellVelocity(grid, state.faceflux(), cell_velocity);
+        Opm::estimateCellVelocity(grid, state.getFaceData( BlackoilState::FACEFLUX ), cell_velocity);
         dm["velocity"] = &cell_velocity;
 
         // Write data (not grid) in Matlab format
@@ -306,7 +306,7 @@ namespace Opm
         // Initialisation.
         std::vector<double> porevol;
         if (rock_comp_props_ && rock_comp_props_->isActive()) {
-            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.pressure(), porevol);
+   	    computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.getCellData(BlackoilState::PRESSURE) , porevol);
         } else {
             computePorevolume(grid_, props_.porosity(), porevol);
         }
@@ -334,7 +334,9 @@ namespace Opm
         if (wells_) {
             well_resflows_phase.resize((wells_->number_of_phases)*(wells_->number_of_wells), 0.0);
             wellreport.push(props_, *wells_,
-                            state.pressure(), state.surfacevol(), state.saturation(),
+                            state.getCellData( BlackoilState::PRESSURE ),
+			    state.getCellData( BlackoilState::SURFACEVOL ),
+			    state.getCellData( BlackoilState::SATURATION ),
                             0.0, well_state.bhp(), well_state.perfRates());
         }
         std::fstream tstep_os;
@@ -358,7 +360,10 @@ namespace Opm
             // Solve pressure equation.
             if (check_well_controls_) {
                 computeFractionalFlow(props_, allcells_,
-                                      state.pressure(), state.temperature(), state.surfacevol(), state.saturation(),
+				      state.getCellData( BlackoilState::PRESSURE ),
+				      state.getCellData( BlackoilState::TEMPERATURE ),
+				      state.getCellData( BlackoilState::SURFACEVOL ),
+				      state.getCellData( BlackoilState::SATURATION ),
                                       fractional_flows);
                 wells_manager_.applyExplicitReinjectionControls(well_resflows_phase, well_resflows_phase);
             }
@@ -367,7 +372,8 @@ namespace Opm
             do {
                 // Run solver.
                 pressure_timer.start();
-                std::vector<double> initial_pressure = state.pressure();
+                std::vector<double> initial_pressure = state.getCellData( BlackoilState::PRESSURE );
+                auto& pressure = state.getCellData( BlackoilState::PRESSURE );
                 psolver_.solve(timer.currentStepLength(), state, well_state);
 
                 // Renormalize pressure if both fluids and rock are
@@ -384,13 +390,13 @@ namespace Opm
                     const int num_cells = grid_.number_of_cells;
                     for (int cell = 0; cell < num_cells; ++cell) {
                         av_prev_press += initial_pressure[cell]*grid_.cell_volumes[cell];
-                        av_press      += state.pressure()[cell]*grid_.cell_volumes[cell];
+                        av_press      += pressure[cell]*grid_.cell_volumes[cell];
                         tot_vol       += grid_.cell_volumes[cell];
                     }
                     // Renormalization constant
                     const double ren_const = (av_prev_press - av_press)/tot_vol;
                     for (int cell = 0; cell < num_cells; ++cell) {
-                        state.pressure()[cell] += ren_const;
+		        pressure[cell] += ren_const;
                     }
                     const int num_wells = (wells_ == NULL) ? 0 : wells_->number_of_wells;
                     for (int well = 0; well < num_wells; ++well) {
@@ -429,7 +435,7 @@ namespace Opm
             // Update pore volumes if rock is compressible.
             if (rock_comp_props_ && rock_comp_props_->isActive()) {
                 initial_porevol = porevol;
-                computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.pressure(), porevol);
+                computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.getCellData( BlackoilState::PRESSURE ), porevol);
             }
 
             // Process transport sources from well flows.
@@ -444,10 +450,17 @@ namespace Opm
             }
             double injected[2] = { 0.0 };
             double produced[2] = { 0.0 };
-            for (int tr_substep = 0; tr_substep < num_transport_substeps_; ++tr_substep) {
-                tsolver_.solve(&state.faceflux()[0], &state.pressure()[0], &state.temperature()[0],
+	    auto& saturation = state.getCellData( BlackoilState::SATURATION );
+	    auto& surfacevol = state.getCellData( BlackoilState::SURFACEVOL );
+
+	    for (int tr_substep = 0; tr_substep < num_transport_substeps_; ++tr_substep) {
+		tsolver_.solve(state.getFaceData( BlackoilState::FACEFLUX ).data(),
+			       state.getCellData( BlackoilState::PRESSURE ).data(),
+			       state.getCellData( BlackoilState::TEMPERATURE ).data(),
                                &initial_porevol[0], &porevol[0], &transport_src[0], stepsize,
-                               state.saturation(), state.surfacevol());
+			       saturation, surfacevol );
+		
+
                 double substep_injected[2] = { 0.0 };
                 double substep_produced[2] = { 0.0 };
                 Opm::computeInjectedProduced(props_, state, transport_src, stepsize,
@@ -457,7 +470,7 @@ namespace Opm
                 produced[0] += substep_produced[0];
                 produced[1] += substep_produced[1];
                 if (gravity_ != 0 && use_segregation_split_) {
-                    tsolver_.solveGravity(columns_, stepsize, state.saturation(), state.surfacevol());
+                    tsolver_.solveGravity(columns_, stepsize, saturation, surfacevol);
                 }
             }
             transport_timer.stop();
@@ -466,7 +479,7 @@ namespace Opm
             std::cout << "Transport solver took: " << tt << " seconds." << std::endl;
             ttime += tt;
             // Report volume balances.
-            Opm::computeSaturatedVol(porevol, state.surfacevol(), inplace_surfvol);
+            Opm::computeSaturatedVol(porevol, surfacevol, inplace_surfvol);
             tot_injected[0] += injected[0];
             tot_injected[1] += injected[1];
             tot_produced[0] += produced[0];
@@ -503,7 +516,7 @@ namespace Opm
                           tot_produced[0]/tot_porevol_init);
             if (wells_) {
                 wellreport.push(props_, *wells_,
-                                state.pressure(), state.surfacevol(), state.saturation(),
+                                state.getCellData( BlackoilState::PRESSURE ), surfacevol, saturation,
                                 timer.simulationTimeElapsed() + timer.currentStepLength(),
                                 well_state.bhp(), well_state.perfRates());
             }

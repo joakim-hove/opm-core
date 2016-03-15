@@ -120,7 +120,7 @@ try
             gravity[2] = deck->hasKeyword("NOGRAV") ? 0.0 : unit::gravity;
             // Init state variables (saturation and pressure).
             if (param.has("init_saturation")) {
-                initStateBasic(ug_grid, *props, param, gravity[2], *state);
+	        initStateBasic(ug_grid, *props, param, gravity[2], *state);
             } else {
                 initStateFromDeck(ug_grid, *props, deck, gravity[2], *state);
             }
@@ -166,7 +166,7 @@ try
         // terms of total pore volume.
         std::vector<double> porevol;
         if (rock_comp->isActive()) {
-            computePorevolume(*grid->c_grid(), props->porosity(), *rock_comp, state->pressure(), porevol);
+  	    computePorevolume(*grid->c_grid(), props->porosity(), *rock_comp, state->getCellData( BlackoilState::PRESSURE ), porevol);
         } else {
             computePorevolume(*grid->c_grid(), props->porosity(), porevol);
         }

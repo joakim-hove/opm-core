@@ -80,6 +80,7 @@ namespace Opm
         if (porevolume[0] != initial_porevolume_cell0_) {
             OPM_THROW(std::runtime_error, "Detected changed pore volumes, but solver cannot handle rock compressibility.");
         }
+	const auto& pressure = state.getCellData( TwophaseState::PRESSURE );
         double ssrc[] = { 1.0, 0.0 };
         double dummy[] = { 0.0, 0.0 };
         clear_transport_source(tsrc_);
@@ -87,9 +88,9 @@ namespace Opm
         for (int cell = 0; cell < grid_.number_of_cells; ++cell) {
             int success = 1;
             if (source[cell] > 0.0) {
-                success = append_transport_source(cell, num_phases, state.pressure()[cell], source[cell], ssrc, dummy, tsrc_);
+                success = append_transport_source(cell, num_phases, pressure[cell], source[cell], ssrc, dummy, tsrc_);
             } else if (source[cell] < 0.0) {
-                success = append_transport_source(cell, num_phases, state.pressure()[cell], source[cell], dummy, dummy, tsrc_);
+                success = append_transport_source(cell, num_phases, pressure[cell], source[cell], dummy, dummy, tsrc_);
             }
             if (!success) {
                 OPM_THROW(std::runtime_error, "Failed building TransportSource struct.");

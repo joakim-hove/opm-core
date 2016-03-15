@@ -891,10 +891,12 @@ namespace Opm
         const int ref_phase = pu.phase_used[BlackoilPhases::Liquid]
             ? pu.phase_pos[BlackoilPhases::Liquid]
             : pu.phase_pos[BlackoilPhases::Aqua];
-        state.pressure() = isc.press()[ref_phase];
-        state.saturation() = Details::convertSats(isc.saturation());
-        state.gasoilratio() = isc.rs();
-        state.rv() = isc.rv();
+	
+        state.getCellData( BlackoilState::PRESSURE ) = isc.press()[ref_phase];
+        state.getCellData( BlackoilState::SATURATION ) = Details::convertSats(isc.saturation());
+        state.getCellData( BlackoilState::GASOILRATIO ) = isc.rs();
+        state.getCellData( BlackoilState::RV ) = isc.rv();
+
         initBlackoilSurfvolUsingRSorRV(UgGridHelpers::numCells(grid), props, state);
     }
 

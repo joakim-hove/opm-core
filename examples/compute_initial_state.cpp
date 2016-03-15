@@ -102,10 +102,10 @@ try
 
     // Output.
     const std::string output_dir = param.getDefault<std::string>("output_dir", "output");
-    outputData(output_dir, "pressure", state.pressure());
-    outputData(output_dir, "saturation", state.saturation());
-    outputData(output_dir, "rs", state.gasoilratio());
-    outputData(output_dir, "rv", state.rv());
+    outputData(output_dir, "pressure", state.getCellData( BlackoilState::PRESSURE ));
+    outputData(output_dir, "saturation", state.getCellData( BlackoilState::SATURATION ));
+    outputData(output_dir, "rs", state.getCellData( BlackoilState::GASOILRATIO ));
+    outputData(output_dir, "rv", state.getCellData( BlackoilState::RV ));
 }
 catch (const std::exception& e) {
     std::cerr << "Program threw an exception: " << e.what() << "\n";

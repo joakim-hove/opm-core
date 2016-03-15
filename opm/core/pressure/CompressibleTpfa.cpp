@@ -141,6 +141,8 @@ namespace Opm
                   << std::setw(18) << res_norm
                   << std::setw(18) << '*' << std::endl;
         while ((iter < maxiter_) && (res_norm > residual_tol_)) {
+	    auto& pressure = state.getCellData(BlackoilState::PRESSURE);
+
             // Solve for increment in Newton method:
             //   incr = x_{n+1} - x_{n} = -J^{-1}F
             // (J is Jacobian matrix, F is residual)
@@ -149,7 +151,7 @@ namespace Opm
 
             // Update pressure vars with increment.
             for (int c = 0; c < nc; ++c) {
-                state.pressure()[c] += pressure_increment_[c];
+                pressure[c] += pressure_increment_[c];
             }
             for (int w = 0; w < nw; ++w) {
                 well_state.bhp()[w] += pressure_increment_[nc + w];
@@ -226,6 +228,10 @@ namespace Opm
         // Temporary storage for perforation A matrices and densities.
         std::vector<double> A(np*np, 0.0);
         std::vector<double> rho(np, 0.0);
+	const auto& pressure = state.getCellData( BlackoilState::PRESSURE );
+	const auto& saturation = state.getCellData( BlackoilState::SATURATION );
+	const auto& surfacevol = state.getCellData( BlackoilState::SURFACEVOL );
+	const auto& temperature = state.getCellData( BlackoilState::TEMPERATURE );
 
         // Main loop, iterate over all perforations,
         // using the following formula (by phase):
@@ -237,10 +243,10 @@ namespace Opm
             for (int j = wells_->well_connpos[w]; j < wells_->well_connpos[w + 1]; ++j) {
                 const int cell = wells_->well_cells[j];
                 const double cell_depth = grid_.cell_centroids[dim * cell + dim - 1];
-                props_.matrix(1, &state.pressure()[cell], &state.temperature()[cell], &state.surfacevol()[np*cell], &cell, &A[0], 0);
+                props_.matrix(1, &pressure[cell], &temperature[cell], &surfacevol[np*cell], &cell, &A[0], 0);
                 props_.density(1, &A[0], &cell, &rho[0]);
                 for (int phase = 0; phase < np; ++phase) {
-                    const double s_phase = state.saturation()[np*cell + phase];
+		    const double s_phase = saturation[np*cell + phase];
                     wellperf_wdp_[j] += s_phase*rho[phase]*grav*(cell_depth - ref_depth);
                 }
             }
@@ -257,7 +263,7 @@ namespace Opm
     {
         computeWellPotentials(state);
         if (rock_comp_props_ && rock_comp_props_->isActive()) {
-            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.pressure(), initial_porevol_);
+            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.getCellData( BlackoilState::PRESSURE ), initial_porevol_);
         }
     }
 
@@ -308,10 +314,10 @@ namespace Opm
         // std::vector<double> rock_comp_; // Empty unless rock_comp_props_ is non-null.
         const int nc = grid_.number_of_cells;
         const int np = props_.numPhases();
-        const double* cell_p = &state.pressure()[0];
-        const double* cell_T = &state.temperature()[0];
-        const double* cell_z = &state.surfacevol()[0];
-        const double* cell_s = &state.saturation()[0];
+        const double* cell_p = state.getCellData( BlackoilState::PRESSURE ).data();
+        const double* cell_T = state.getCellData( BlackoilState::TEMPERATURE ).data();
+        const double* cell_z = state.getCellData( BlackoilState::SURFACEVOL ).data();
+        const double* cell_s = state.getCellData( BlackoilState::SATURATION ).data();
         cell_A_.resize(nc*np*np);
         cell_dA_.resize(nc*np*np);
         props_.matrix(nc, cell_p, cell_T, cell_z, &allcells_[0], &cell_A_[0], &cell_dA_[0]);
@@ -332,10 +338,11 @@ namespace Opm
         cell_voldisc_.resize(nc, 0.0);
 
         if (rock_comp_props_ && rock_comp_props_->isActive()) {
-            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.pressure(), porevol_);
+   	    const auto& pressure = state.getCellData(BlackoilState::PRESSURE);
+            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, pressure, porevol_);
             rock_comp_.resize(nc);
             for (int cell = 0; cell < nc; ++cell) {
-                rock_comp_[cell] = rock_comp_props_->rockComp(state.pressure()[cell]);
+	        rock_comp_[cell] = rock_comp_props_->rockComp(pressure[cell]);
             }
         }
     }
@@ -357,6 +364,8 @@ namespace Opm
         const int nf = grid_.number_of_faces;
         const int dim = grid_.dimensions;
         const double grav = gravity_ ? gravity_[dim - 1] : 0.0;
+	const auto& pressure = state.getCellData(BlackoilState::PRESSURE);
+	const auto& facepressure = state.getFaceData(BlackoilState::FACEPRESSURE);
         std::vector<double> gravcontrib[2];
         std::vector<double> pot[2];
         gravcontrib[0].resize(np);
@@ -377,7 +386,7 @@ namespace Opm
             for (int j = 0; j < 2; ++j) {
                 if (c[j] >= 0) {
                     // Pressure
-                    c_press[j] = state.pressure()[c[j]];
+		    c_press[j] = pressure[c[j]];
                     // Gravity contribution, gravcontrib = rho*(face_z - cell_z) [per phase].
                     if (grav != 0.0) {
                         const double depth_diff = face_depth - grid_.cell_centroids[c[j]*dim + dim - 1];
@@ -390,7 +399,7 @@ namespace Opm
                     }
                 } else {
                     // Pressures
-                    c_press[j] = state.facepressure()[face];
+                    c_press[j] = facepressure[face];
                     // Gravity contribution.
                     std::fill(gravcontrib[j].begin(), gravcontrib[j].end(), 0.0);
                 }
@@ -508,8 +517,8 @@ namespace Opm
                                     const BlackoilState& state,
                                     const WellState& well_state)
     {
-        const double* cell_press = &state.pressure()[0];
-        const double* well_bhp = well_state.bhp().empty() ? NULL : &well_state.bhp()[0];
+        const double* cell_press = state.getCellData( BlackoilState::PRESSURE ).data();
+	const double* well_bhp = well_state.bhp().empty() ? NULL : &well_state.bhp()[0];
         const double* z = &state.surfacevol()[0];
         UnstructuredGrid* gg = const_cast<UnstructuredGrid*>(&grid_);
         CompletionData completion_data;
@@ -612,6 +621,9 @@ namespace Opm
 
         double* wpress = ! well_state.bhp      ().empty() ? & well_state.bhp      ()[0] : 0;
         double* wflux  = ! well_state.perfRates().empty() ? & well_state.perfRates()[0] : 0;
+	const auto& pressure = state.getCellData(BlackoilState::PRESSURE);
+	auto& faceflux = state.getFaceData(BlackoilState::FACEFLUX);
+	auto& facepressure = state.getFaceData(BlackoilState::FACEPRESSURE);
 
         cfs_tpfa_res_flux(gg,
                           &forces,
@@ -620,19 +632,20 @@ namespace Opm
                           &cell_phasemob_[0],
                           &face_phasemob_[0],
                           &face_gravcap_[0],
-                          &state.pressure()[0],
+                          pressure.data(),
                           wpress,
-                          &state.faceflux()[0],
+			  faceflux.data(),
                           wflux);
+
         cfs_tpfa_res_fpress(gg,
                             props_.numPhases(),
                             &htrans_[0],
                             &face_phasemob_[0],
                             &face_gravcap_[0],
                             h_,
-                            &state.pressure()[0],
-                            &state.faceflux()[0],
-                            &state.facepressure()[0]);
+                            pressure.data(),
+			    faceflux.data(),
+                            facepressure.data());
 
         // Compute well perforation pressures (not done by the C code).
         if (wells_ != 0) {

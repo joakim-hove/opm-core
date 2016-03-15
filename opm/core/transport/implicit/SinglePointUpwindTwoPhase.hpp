@@ -372,7 +372,8 @@ namespace Opm {
                        double*               F    ) const {
 
             const int *n = g.face_cells + (2 * f);
-            double dflux = state.faceflux()[f];
+	    const auto& faceflux = state.getFaceData( ReservoirState::FACEFLUX );
+            double dflux = faceflux[f];
             double gflux = gravityFlux(f);
             double pcflux,dpcflux[2];
             capFlux(f,n, pcflux, dpcflux);
@@ -522,7 +523,7 @@ namespace Opm {
 	    if (init_step_use_previous_sol_) {
 		std::fill(x.begin(), x.end(), 0.0);
             } else {
-		const std::vector<double>& s = state.saturation();
+	        const std::vector<double>& s = state.getCellData( ReservoirState::SATURATION );
 		for (int c = 0, nc = g.number_of_cells; c < nc; ++c) {
 		    // Impose s=0.5 at next time level as an NR initial value.
 		    x[c] = 0.5 - s[2*c + 0];
@@ -542,7 +543,7 @@ namespace Opm {
 
             const typename JacobianSystem::vector_type& x =
                 sys.vector().solution();
-            const ::std::vector<double>& sat = state.saturation();
+            const ::std::vector<double>& sat = state.getCellData( ReservoirState::SATURATION );
 
             bool in_range = true;
             for (int c = 0; c < g.number_of_cells; ++c) {
@@ -603,7 +604,7 @@ namespace Opm {
                    const SolutionVector& x    ,
                    ReservoirState&       state) {
 
-            double *s = &state.saturation()[0*2 + 0];
+	    double *s = &state.getCellData( ReservoirState::SATURATION )[0*2 + 0];
 
             for (int c = 0; c < g.number_of_cells; ++c, s += 2) {
                 s[0] += x[c];

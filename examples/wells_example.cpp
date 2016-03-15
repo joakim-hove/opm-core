@@ -87,7 +87,7 @@ try
 
     const int np = incomp_properties.numPhases();
     std::vector<double> fractional_flows(grid.c_grid()->number_of_cells*np, 0.0);
-    computeFractionalFlow(incomp_properties, all_cells, state.saturation(), fractional_flows);
+    computeFractionalFlow(incomp_properties, all_cells, state.getCellData( TwophaseState::SATURATION ), fractional_flows);
 
     // This will be refactored into a separate function once done
     std::vector<double> well_resflows(wells.c_wells()->number_of_wells*np, 0.0);
@@ -134,7 +134,7 @@ try
 
     tsolver.solve(*grid->c_grid(), tsrc, stepsize, ctrl, state, linsolve, rpt);
 
-    Opm::computeInjectedProduced(*props, state.saturation(), src, stepsize, injected, produced);
+    Opm::computeInjectedProduced(*props, state.getCellData( TwophaseState::SATURATION ) , src, stepsize, injected, produced);
 #endif
     return 0;
 }

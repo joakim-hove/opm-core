@@ -113,7 +113,7 @@ std::shared_ptr<Opm::BlackoilState> createBlackoilState(int timeStepIdx, std::sh
     std::shared_ptr<Opm::BlackoilState> blackoilState = std::make_shared<Opm::BlackoilState>(Opm::UgGridHelpers::numCells( ug_grid ) , Opm::UgGridHelpers::numFaces( ug_grid ), 3);
     size_t numCells = Opm::UgGridHelpers::numCells( ug_grid );
 
-    auto &pressure = blackoilState->pressure();
+    auto &pressure = blackoilState->getCellData( Opm::BlackoilState::PRESSURE );
     for (size_t cellIdx = 0; cellIdx < numCells; ++cellIdx) {
         pressure[cellIdx] = timeStepIdx*1e5 + 1e4 + cellIdx;
     }

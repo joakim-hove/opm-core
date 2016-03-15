@@ -68,8 +68,8 @@ BOOST_AUTO_TEST_CASE(EqualsNumericalDifferenceReturnFalse) {
 
     BOOST_CHECK_EQUAL( true , state1.equal(state2) );
     {
-        std::vector<double>& p1 = state1.pressure();
-        std::vector<double>& p2 = state2.pressure();
+        std::vector<double>& p1 = state1.getCellData( Opm::BlackoilState::PRESSURE );
+        std::vector<double>& p2 = state2.getCellData( Opm::BlackoilState::PRESSURE );
         p1[0] = p1[0] * 2 + 1;
 
         BOOST_CHECK_EQUAL( false , state1.equal(state2) );
@@ -77,8 +77,8 @@ BOOST_AUTO_TEST_CASE(EqualsNumericalDifferenceReturnFalse) {
         BOOST_CHECK_EQUAL( true , state1.equal(state2) );
     }
     {
-        std::vector<double>& gor1 = state1.gasoilratio();
-        std::vector<double>& gor2 = state2.gasoilratio();
+        std::vector<double>& gor1 = state1.getCellData( Opm::BlackoilState::GASOILRATIO );
+        std::vector<double>& gor2 = state2.getCellData( Opm::BlackoilState::GASOILRATIO );
         gor1[0] = gor1[0] * 2 + 1;
 
         BOOST_CHECK_EQUAL( false , state1.equal(state2) );
@@ -86,8 +86,8 @@ BOOST_AUTO_TEST_CASE(EqualsNumericalDifferenceReturnFalse) {
         BOOST_CHECK_EQUAL( true , state1.equal(state2) );
     }
     {
-        std::vector<double>& p1 = state1.facepressure();
-        std::vector<double>& p2 = state2.facepressure();
+        std::vector<double>& p1 = state1.getFaceData( Opm::BlackoilState::FACEPRESSURE );
+        std::vector<double>& p2 = state2.getFaceData( Opm::BlackoilState::FACEPRESSURE );
         p1[0] = p1[0] * 2 + 1;
 
         BOOST_CHECK_EQUAL( false , state1.equal(state2) );
@@ -96,8 +96,8 @@ BOOST_AUTO_TEST_CASE(EqualsNumericalDifferenceReturnFalse) {
     }
 
     {
-        std::vector<double>& f1 = state1.faceflux();
-        std::vector<double>& f2 = state2.faceflux();
+        std::vector<double>& f1 = state1.getFaceData( Opm::BlackoilState::FACEFLUX );
+        std::vector<double>& f2 = state2.getFaceData( Opm::BlackoilState::FACEFLUX );
         if (f1.size() > 0 ) {
             f1[0] = f1[0] * 2 + 1;
 
@@ -107,8 +107,8 @@ BOOST_AUTO_TEST_CASE(EqualsNumericalDifferenceReturnFalse) {
         }
     }
     {
-        std::vector<double>& sv1 = state1.surfacevol();
-        std::vector<double>& sv2 = state2.surfacevol();
+        std::vector<double>& sv1 = state1.getCellData( Opm::BlackoilState::SURFACEVOL );
+        std::vector<double>& sv2 = state2.getCellData( Opm::BlackoilState::SURFACEVOL );
         if (sv1.size() > 0) {
             sv1[0] = sv1[0] * 2 + 1;
 
@@ -118,8 +118,8 @@ BOOST_AUTO_TEST_CASE(EqualsNumericalDifferenceReturnFalse) {
         }
     }
     {
-        std::vector<double>& sat1 = state1.saturation();
-        std::vector<double>& sat2 = state2.saturation();
+        std::vector<double>& sat1 = state1.getCellData( Opm::BlackoilState::SATURATION );
+        std::vector<double>& sat2 = state2.getCellData( Opm::BlackoilState::SATURATION );
         sat1[0] = sat1[0] * 2 + 1;
 
         BOOST_CHECK_EQUAL( false , state1.equal(state2) );

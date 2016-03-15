@@ -70,13 +70,16 @@ namespace Opm
             OPM_THROW(std::runtime_error, "Size of transport_src vector does not match number of cells in props.");
         }
         const int np = props.numPhases();
-        if (int(state.saturation().size()) != num_cells*np) {
-            OPM_THROW(std::runtime_error, "Sizes of state vectors do not match number of cells.");
-        }
-        const std::vector<double>& press = state.pressure();
-        const std::vector<double>& temp = state.temperature();
-        const std::vector<double>& s = state.saturation();
-        const std::vector<double>& z = state.surfacevol();
+	{
+	    const auto& saturation = state.getCellData( BlackoilState::SATURATION );
+	    if (int(saturation.size()) != num_cells*np) {
+		OPM_THROW(std::runtime_error, "Sizes of state vectors do not match number of cells.");
+	    }
+	}
+        const std::vector<double>& press = state.getCellData( BlackoilState::PRESSURE );
+        const std::vector<double>& temp = state.getCellData( BlackoilState::TEMPERATURE );
+        const std::vector<double>& s = state.getCellData( BlackoilState::SATURATION );
+        const std::vector<double>& z = state.getFaceData( BlackoilState::SURFACEVOL );
         std::fill(injected, injected + np, 0.0);
         std::fill(produced, produced + np, 0.0);
         std::vector<double> visc(np);
@@ -304,9 +307,12 @@ namespace Opm
         }
 
         //std::vector<double> res_vol(np);
-        const std::vector<double>& z = state.surfacevol();
+        const std::vector<double>& z = state.getCellData( BlackoilState::SURFACEVOL );
+	const double* pressure       = state.getCellData( BlackoilState::PRESSURE ).data();
+	const double* temperature    = state.getCellData( BlackoilState::TEMPERATURE ).data();
+	double* s                    = state.getCellData( BlackoilState::SATURATION ).data();
 
-        props.matrix(nc, &state.pressure()[0], &state.temperature()[0], &z[0], &allcells[0], &allA[0], 0);
+        props.matrix(nc, pressure, temperature, &z[0], &allcells[0], &allA[0], 0);
 
         // Linear solver.
         MAT_SIZE_T n = np;
@@ -324,7 +330,6 @@ namespace Opm
         for (int c = 0; c < nc; ++c) {
             double* A = &allA[c*np*np];
             const double* z_loc = &z[c*np];
-            double* s = &state.saturation()[c*np];
 
             for (int p = 0; p < np; ++p){
                 s[p] = z_loc[p];

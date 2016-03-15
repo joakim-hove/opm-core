@@ -180,7 +180,7 @@ try
         // terms of total pore volume.
         std::vector<double> porevol;
         if (rock_comp->isActive()) {
-            computePorevolume(*grid->c_grid(), props->porosity(), *rock_comp, state->pressure(), porevol);
+            computePorevolume(*grid->c_grid(), props->porosity(), *rock_comp, state->getCellData( TwophaseState::PRESSURE ), porevol);
         } else {
             computePorevolume(*grid->c_grid(), props->porosity(), porevol);
         }

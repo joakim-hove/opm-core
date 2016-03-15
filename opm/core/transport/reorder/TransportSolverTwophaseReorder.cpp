@@ -95,11 +95,11 @@ namespace Opm
                                                const double dt,
                                                TwophaseState& state)
     {
-        darcyflux_ = &state.faceflux()[0];
+        darcyflux_ = state.getFaceData( TwophaseState::FACEFLUX ).data();
         porevolume_ = porevolume;
         source_ = source;
         dt_ = dt;
-        toWaterSat(state.saturation(), saturation_);
+        toWaterSat(state.getCellData( TwophaseState::SATURATION ), saturation_);
 
 #ifdef EXPERIMENT_GAUSS_SEIDEL
         std::vector<int> seq(grid_.number_of_cells);
@@ -117,7 +117,7 @@ namespace Opm
 #endif
         std::fill(reorder_iterations_.begin(),reorder_iterations_.end(),0);
         reorderAndTransport(grid_, darcyflux_);
-        toBothSat(saturation_, state.saturation());
+        toBothSat(saturation_, state.getCellData( TwophaseState::SATURATION ));
     }
 
 
@@ -650,7 +650,7 @@ namespace Opm
             cells[c] = c;
         }
         mob_.resize(2*nc);
-        props_.relperm(cells.size(), &state.saturation()[0], &cells[0], &mob_[0], 0);
+        props_.relperm(cells.size(), state.getCellData( TwophaseState::SATURATION ).data(), &cells[0], &mob_[0], 0);
         const double* mu = props_.viscosity();
         for (int c = 0; c < nc; ++c) {
             mob_[2*c] /= mu[0];
@@ -660,7 +660,7 @@ namespace Opm
         // Set up other variables.
         porevolume_ = porevolume;
         dt_ = dt;
-        toWaterSat(state.saturation(), saturation_);
+        toWaterSat(state.getCellData( TwophaseState::SATURATION ) , saturation_);
 
         // Solve on all columns.
         int num_iters = 0;
@@ -671,7 +671,7 @@ namespace Opm
         std::cout << "Gauss-Seidel column solver average iterations: "
                   << double(num_iters)/double(columns_.size()) << std::endl;
 
-        toBothSat(saturation_, state.saturation());
+        toBothSat(saturation_, state.getCellData( TwophaseState::SATURATION ));
     }
 
 } // namespace Opm

@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(TestStoppedWells)
 
     const std::vector<double> pressure = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
     BlackoilState state( pressure.size() , 0 , 3);
-    state.pressure() = pressure;
+    state.getCellData( BlackoilState::PRESSURE ) = pressure;
 
     // Both wells are open in the first schedule step
     {

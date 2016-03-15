@@ -1235,32 +1235,27 @@ void EclipseWriter::writeTimeStep(const SimulatorTimerInterface& timer,
         return;
     }
 
-
-    std::vector<double> pressure = reservoirState.pressure();
+    std::vector<double> pressure = reservoirState.getCellData( SimulationDataContainer::PRESSURE );
     EclipseWriterDetails::convertFromSiTo(pressure, deckToSiPressure_);
     EclipseWriterDetails::restrictAndReorderToActiveCells(pressure, gridToEclipseIdx_.size(), gridToEclipseIdx_.data());
 
     std::vector<double> saturation_water;
     std::vector<double> saturation_gas;
-
     if (phaseUsage_.phase_used[BlackoilPhases::Aqua]) {
-        saturation_water = reservoirState.saturation();
+        saturation_water = reservoirState.getCellData(SimulationDataContainer::SATURATION);
         EclipseWriterDetails::extractFromStripedData(saturation_water,
                                                      /*offset=*/phaseUsage_.phase_pos[BlackoilPhases::Aqua],
                                                      /*stride=*/phaseUsage_.num_phases);
         EclipseWriterDetails::restrictAndReorderToActiveCells(saturation_water, gridToEclipseIdx_.size(), gridToEclipseIdx_.data());
     }
 
-
     if (phaseUsage_.phase_used[BlackoilPhases::Vapour]) {
-        saturation_gas = reservoirState.saturation();
+        saturation_gas = reservoirState.getCellData(SimulationDataContainer::SATURATION);
         EclipseWriterDetails::extractFromStripedData(saturation_gas,
                                                      /*offset=*/phaseUsage_.phase_pos[BlackoilPhases::Vapour],
                                                      /*stride=*/phaseUsage_.num_phases);
         EclipseWriterDetails::restrictAndReorderToActiveCells(saturation_gas, gridToEclipseIdx_.size(), gridToEclipseIdx_.data());
     }
-
-
 
     IOConfigConstPtr ioConfig = eclipseState_->getIOConfigConst();
 
@@ -1329,7 +1324,7 @@ void EclipseWriter::writeTimeStep(const SimulatorTimerInterface& timer,
 
 
         // write the cell temperature
-        std::vector<double> temperature = reservoirState.temperature();
+        std::vector<double> temperature = reservoirState.getCellData(SimulationDataContainer::TEMPERATURE);
         EclipseWriterDetails::convertFromSiTo(temperature, deckToSiTemperatureFactor_, deckToSiTemperatureOffset_);
         EclipseWriterDetails::restrictAndReorderToActiveCells(temperature, gridToEclipseIdx_.size(), gridToEclipseIdx_.data());
         sol.add(EclipseWriterDetails::Keyword<float>("TEMP", temperature));

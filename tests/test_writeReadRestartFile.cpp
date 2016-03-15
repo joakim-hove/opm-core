@@ -272,39 +272,45 @@ BOOST_AUTO_TEST_CASE(EclipseReadWriteWellStateData)
     wellState->init(wells, *blackoilState);
 
     //Set test data for pressure
-    std::vector<double>& pressure = blackoilState->pressure();
-    for (std::vector<double>::iterator iter = pressure.begin(); iter != pressure.end(); ++iter) {
-        *iter = 6.0;
-    }
+    std::vector<double>& pressure = blackoilState->getCellData( Opm::BlackoilState::PRESSURE );
+    std::fill( pressure.begin() , pressure.end() , 6.0 );
 
     //Set test data for temperature
-    std::vector<double>& temperature = blackoilState->temperature();
-    for (std::vector<double>::iterator iter = temperature.begin(); iter != temperature.end(); ++iter) {
-        *iter = 7.0;
-    }
+    std::vector<double>& temperature = blackoilState->getCellData( Opm::BlackoilState::TEMPERATURE );
+    std::fill( temperature.begin() , temperature.end() , 7 );
 
+    std::vector<double>& saturation = blackoilState->getCellData( Opm::BlackoilState::SATURATION );
     //Set test data for saturation water
     std::vector<double> swatdata(1000, 8);
-    Opm::EclipseIOUtil::addToStripedData(swatdata, blackoilState->saturation(), phaseUsage.phase_pos[Opm::BlackoilPhases::Aqua], phaseUsage.num_phases);
+    Opm::EclipseIOUtil::addToStripedData(swatdata, saturation, phaseUsage.phase_pos[Opm::BlackoilPhases::Aqua], phaseUsage.num_phases);
 
     //Set test data for saturation gas
     std::vector<double> sgasdata(1000, 9);
-    Opm::EclipseIOUtil::addToStripedData(sgasdata, blackoilState->saturation(), phaseUsage.phase_pos[Opm::BlackoilPhases::Vapour], phaseUsage.num_phases);
+    Opm::EclipseIOUtil::addToStripedData(sgasdata, saturation, phaseUsage.phase_pos[Opm::BlackoilPhases::Vapour], phaseUsage.num_phases);
 
     // Set test data for rs
-    double rs = 300.0;
-    std::vector<double>& rs_vec = blackoilState->gasoilratio();
-    for (std::vector<double>::iterator rs_iter = rs_vec.begin(); rs_iter != rs_vec.end(); ++ rs_iter) {
-        *rs_iter = rs;
-        rs = rs + 1.0;
+    std::vector<double>& rs = blackoilState->getCellData( Opm::BlackoilState::GASOILRATIO );
+    {    
+	double current_rs = 300.0;
+	std::for_each(rs.begin(), rs.end(), 
+		      [&current_rs](double &rs)
+		      { 
+			  rs = current_rs;
+			  current_rs++;
+		      });
     }
 
+    
     // Set testdata for rv
-    double rv = 400.0;
-    std::vector<double>& rv_vec = blackoilState->rv();
-    for (std::vector<double>::iterator rv_iter = rv_vec.begin(); rv_iter != rv_vec.end(); ++rv_iter) {
-        *rv_iter = rv;
-        rv = rv + 1.0;
+    std::vector<double>& rv = blackoilState->getCellData( Opm::BlackoilState::RV );
+    {    
+	double current_rv = 400.0;
+	std::for_each(rv.begin(), rv.end(), 
+		      [&current_rv](double &rv)
+		      { 
+			  rv = current_rv;
+			  current_rv++;
+		      });
     }
 
     setValuesInWellState(wellState);
@@ -324,26 +330,32 @@ BOOST_AUTO_TEST_CASE(EclipseReadWriteWellStateData)
     BOOST_CHECK_EQUAL_COLLECTIONS(wellState->perfRates().begin(), wellState->perfRates().end(), wellStateRestored->perfRates().begin(), wellStateRestored->perfRates().end());
     BOOST_CHECK_EQUAL_COLLECTIONS(wellState->perfPress().begin(), wellState->perfPress().end(), wellStateRestored->perfPress().begin(), wellStateRestored->perfPress().end());
 
+    std::vector<double>& saturation_restored = blackoilStateRestored->getCellData( Opm::BlackoilState::SATURATION );
     std::vector<double> swat_restored;
     std::vector<double> swat;
     std::vector<double> sgas_restored;
     std::vector<double> sgas;
-    Opm::EclipseIOUtil::extractFromStripedData(blackoilStateRestored->saturation(), swat_restored, phaseUsage.phase_pos[Opm::BlackoilPhases::Aqua], phaseUsage.num_phases);
-    Opm::EclipseIOUtil::extractFromStripedData(blackoilState->saturation(), swat, phaseUsage.phase_pos[Opm::BlackoilPhases::Aqua], phaseUsage.num_phases);
-    Opm::EclipseIOUtil::extractFromStripedData(blackoilStateRestored->saturation(), sgas_restored, phaseUsage.phase_pos[Opm::BlackoilPhases::Vapour], phaseUsage.num_phases);
-    Opm::EclipseIOUtil::extractFromStripedData(blackoilState->saturation(), sgas, phaseUsage.phase_pos[Opm::BlackoilPhases::Vapour], phaseUsage.num_phases);
+    Opm::EclipseIOUtil::extractFromStripedData(saturation_restored, swat_restored, phaseUsage.phase_pos[Opm::BlackoilPhases::Aqua], phaseUsage.num_phases);
+    Opm::EclipseIOUtil::extractFromStripedData(saturation, swat, phaseUsage.phase_pos[Opm::BlackoilPhases::Aqua], phaseUsage.num_phases);
+    Opm::EclipseIOUtil::extractFromStripedData(saturation_restored, sgas_restored, phaseUsage.phase_pos[Opm::BlackoilPhases::Vapour], phaseUsage.num_phases);
+    Opm::EclipseIOUtil::extractFromStripedData(saturation, sgas, phaseUsage.phase_pos[Opm::BlackoilPhases::Vapour], phaseUsage.num_phases);
 
+
+    std::vector<double>& pressure_restored = blackoilStateRestored->getCellData( Opm::BlackoilState::PRESSURE );
+    std::vector<double>& temperature_restored = blackoilStateRestored->getCellData( Opm::BlackoilState::TEMPERATURE );
+    std::vector<double>& rs_restored = blackoilStateRestored->getCellData( Opm::BlackoilState::GASOILRATIO );
+    std::vector<double>& rv_restored = blackoilStateRestored->getCellData( Opm::BlackoilState::RV );
+
+
+    
     for (size_t cellindex = 0; cellindex < 10; ++cellindex) {
-        BOOST_CHECK_CLOSE(blackoilState->pressure()[cellindex], blackoilStateRestored->pressure()[cellindex], 0.00001);
-        BOOST_CHECK_CLOSE(blackoilState->temperature()[cellindex], blackoilStateRestored->temperature()[cellindex], 0.00001);
+	BOOST_CHECK_CLOSE(pressure[cellindex], pressure_restored[cellindex], 0.00001);
+        BOOST_CHECK_CLOSE(temperature[cellindex], temperature_restored[cellindex], 0.00001);
+	BOOST_CHECK_CLOSE(rs[cellindex], rs_restored[cellindex], 0.0000001);
+        BOOST_CHECK_CLOSE(rv[cellindex], rv_restored[cellindex], 0.0000001);
+
         BOOST_CHECK_CLOSE(swat[cellindex], swat_restored[cellindex], 0.00001);
         BOOST_CHECK_CLOSE(sgas[cellindex], sgas_restored[cellindex], 0.00001);
-    }
-
-
-    for (size_t cellindex = 0; cellindex < 10; ++cellindex) {
-        BOOST_CHECK_CLOSE(blackoilState->gasoilratio()[cellindex], blackoilStateRestored->gasoilratio()[cellindex], 0.0000001);
-        BOOST_CHECK_CLOSE(blackoilState->rv()[cellindex], blackoilStateRestored->rv()[cellindex], 0.0000001);
     }
 
     test_work_area_free(test_area);

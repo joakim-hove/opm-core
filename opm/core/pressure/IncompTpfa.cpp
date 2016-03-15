@@ -187,18 +187,23 @@ namespace Opm
         linsolver_.solve(h_->A, h_->b, h_->x);
 
         // Obtain solution.
-        assert(int(state.pressure().size()) == grid_.number_of_cells);
-        assert(int(state.faceflux().size()) == grid_.number_of_faces);
-        ifs_tpfa_solution soln = { NULL, NULL, NULL, NULL };
-        soln.cell_press = &state.pressure()[0];
-        soln.face_flux  = &state.faceflux()[0];
-        if (wells_ != NULL) {
-            assert(int(well_state.bhp().size()) == wells_->number_of_wells);
-            assert(int(well_state.perfRates().size()) == wells_->well_connpos[ wells_->number_of_wells ]);
-            soln.well_flux = &well_state.perfRates()[0];
-            soln.well_press = &well_state.bhp()[0];
-        }
-        ifs_tpfa_press_flux(gg, &forces_, &trans_[0], h_, &soln);
+	{
+	    auto& pressure = state.getCellData( SimulationDataContainer::PRESSURE );
+	    auto& faceflux = state.getFaceData( SimulationDataContainer::FACEFLUX );
+
+	    assert(int(pressure.size()) == grid_.number_of_cells);
+	    assert(int(faceflux.size()) == grid_.number_of_faces);
+	    ifs_tpfa_solution soln = { NULL, NULL, NULL, NULL };
+	    soln.cell_press = pressure.data();
+	    soln.face_flux  = faceflux.data();
+	    if (wells_ != NULL) {
+		assert(int(well_state.bhp().size()) == wells_->number_of_wells);
+		assert(int(well_state.perfRates().size()) == wells_->well_connpos[ wells_->number_of_wells ]);
+		soln.well_flux = &well_state.perfRates()[0];
+		soln.well_press = &well_state.bhp()[0];
+	    }
+	    ifs_tpfa_press_flux(gg, &forces_, &trans_[0], h_, &soln);
+	}
     }
 
 
@@ -232,6 +237,7 @@ namespace Opm
                   << std::setw(18) << res_norm
                   << std::setw(18) << '*' << std::endl;
         while ((iter < maxiter_) && (res_norm > residual_tol_)) {
+	    auto& pressure = state.getCellData( SimulationDataContainer::PRESSURE );
             // Solve for increment in Newton method:
             //   incr = x_{n+1} - x_{n} = -J^{-1}F
             // (J is Jacobian matrix, F is residual)
@@ -240,7 +246,7 @@ namespace Opm
 
             // Update pressure vars with increment.
             for (int c = 0; c < nc; ++c) {
-                state.pressure()[c] += h_->x[c];
+                pressure[c] += h_->x[c];
             }
             for (int w = 0; w < nw; ++w) {
                 well_state.bhp()[w] += h_->x[nc + w];
@@ -337,23 +343,23 @@ namespace Opm
 
         // wdp_
         if (wells_) {
-            Opm::computeWDP(*wells_, grid_, state.saturation(), props_.density(),
+            Opm::computeWDP(*wells_, grid_, state.getCellData( SimulationDataContainer::SATURATION ), props_.density(),
                             gravity_ ? gravity_[2] : 0.0, true, wdp_);
         }
         // totmob_, omega_, gpress_omegaweighted_
         if (gravity_) {
-            computeTotalMobilityOmega(props_, allcells_, state.saturation(), totmob_, omega_);
+            computeTotalMobilityOmega(props_, allcells_, state.getCellData( SimulationDataContainer::SATURATION ), totmob_, omega_);
             mim_ip_density_update(grid_.number_of_cells, grid_.cell_facepos,
                                   &omega_[0],
                                   &gpress_[0], &gpress_omegaweighted_[0]);
         } else {
-            computeTotalMobility(props_, allcells_, state.saturation(), totmob_);
+            computeTotalMobility(props_, allcells_, state.getCellData( SimulationDataContainer::SATURATION ), totmob_);
         }
         // trans_
         tpfa_eff_trans_compute(const_cast<UnstructuredGrid*>(&grid_), &totmob_[0], &htrans_[0], &trans_[0]);
         // initial_porevol_
         if (rock_comp_props_ && rock_comp_props_->isActive()) {
-            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.pressure(), initial_porevol_);
+            computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.getCellData( SimulationDataContainer::PRESSURE ) , initial_porevol_);
         }
         // forces_
         forces_.src = src_.empty() ? NULL : &src_[0];
@@ -379,14 +385,15 @@ namespace Opm
         // std::vector<double> rock_comp_
         // std::vector<double> pressures_
 
-        computePorevolume(grid_, props_.porosity(), *rock_comp_props_, state.pressure(), porevol_);
+	const auto & pressure = state.getCellData( SimulationDataContainer::PRESSURE );
+        computePorevolume(grid_, props_.porosity(), *rock_comp_props_, pressure , porevol_);
         if (rock_comp_props_ && rock_comp_props_->isActive()) {
             for (int cell = 0; cell < grid_.number_of_cells; ++cell) {
-                rock_comp_[cell] = rock_comp_props_->rockComp(state.pressure()[cell]);
+                rock_comp_[cell] = rock_comp_props_->rockComp(pressure[cell]);
             }
         }
         if (wells_) {
-            std::copy(state.pressure().begin(), state.pressure().end(), pressures_.begin());
+            std::copy(pressure.begin(), pressure.end(), pressures_.begin());
             std::copy(well_state.bhp().begin(), well_state.bhp().end(), pressures_.begin() + grid_.number_of_cells);
         }
     }
@@ -400,7 +407,7 @@ namespace Opm
                               const SimulationDataContainer& state,
                               const WellState& /*well_state*/)
     {
-        const double* pressures = wells_ ? &pressures_[0] : &state.pressure()[0];
+        const double* pressures = wells_ ? &pressures_[0] : state.getCellData( SimulationDataContainer::PRESSURE ).data();
 
         bool ok = ifs_tpfa_assemble_comprock_increment(const_cast<UnstructuredGrid*>(&grid_),
                                                        &forces_, &trans_[0], &gpress_omegaweighted_[0],
@@ -470,19 +477,20 @@ namespace Opm
         // and right hand side (not jacobian and residual).
         // TODO: optimize by only adjusting b and diagonal of A.
         UnstructuredGrid* gg = const_cast<UnstructuredGrid*>(&grid_);
+	auto& pressure = state.getCellData( SimulationDataContainer::PRESSURE );
+	auto& faceflux = state.getFaceData( SimulationDataContainer::FACEFLUX );
         ifs_tpfa_assemble(gg, &forces_, &trans_[0], &gpress_omegaweighted_[0], h_);
 
-
         // Make sure h_->x contains the direct solution vector.
-        assert(int(state.pressure().size()) == grid_.number_of_cells);
-        assert(int(state.faceflux().size()) == grid_.number_of_faces);
-        std::copy(state.pressure().begin(), state.pressure().end(), h_->x);
+        assert(int(pressure.size()) == grid_.number_of_cells);
+        assert(int(faceflux.size()) == grid_.number_of_faces);
+        std::copy(pressure.begin(), pressure.end(), h_->x);
         std::copy(well_state.bhp().begin(), well_state.bhp().end(), h_->x + grid_.number_of_cells);
 
         // Obtain solution.
         ifs_tpfa_solution soln = { NULL, NULL, NULL, NULL };
-        soln.cell_press = &state.pressure()[0];
-        soln.face_flux  = &state.faceflux()[0];
+        soln.cell_press = pressure.data();
+        soln.face_flux  = faceflux.data();
         if (wells_ != NULL) {
             assert(int(well_state.bhp().size()) == wells_->number_of_wells);
             assert(int(well_state.perfRates().size()) == wells_->well_connpos[ wells_->number_of_wells ]);
